@@ -478,6 +478,7 @@ class FlutterContacts {
             context: Context,
             contactMap: Map<String, Any?>
         ): Map<String, Any?>? {
+            Log.e("FlutterContacts", "FC_MARKER: insert called")
             val ops = mutableListOf<ContentProviderOperation>()
 
             val contact = Contact.fromMap(contactMap)
