@@ -493,8 +493,16 @@ class FlutterContacts {
             // case, we need to use an appropriate cloud account.
             if (contact.accounts.isEmpty()) {
                 // Try to get a suitable default account to avoid the cloud account error
-                val (accountType, accountName) = getDefaultWritableAccount(context, resolver)
-                
+                val defaultAccount = getDefaultWritableAccount(context, resolver)
+                if (defaultAccount == null) {
+                    // Surface a clear error instead of crashing
+                    throw IllegalStateException(
+                        "No writable cloud account found for contacts. " +
+                            "Please add a Google account or change the default contacts account."
+                    )
+                }
+
+                val (accountType, accountName) = defaultAccount
                 ops.add(
                     ContentProviderOperation.newInsert(RawContacts.CONTENT_URI)
                         .withValue(RawContacts.ACCOUNT_TYPE, accountType)
@@ -1377,32 +1385,57 @@ class FlutterContacts {
         }
 
         /**
-         * Get the system's default cloud account for new contacts, or return null if default account is not cloud.
-         * Uses the DefaultAccount API (available from Android 8.0 API 26+) when possible,
-         * falls back to Google account detection on older versions.
+         * Get the system's default cloud account for new contacts.
+         * Never falls back to local/SIM when system default is cloud, to avoid provider crash.
          */
-        private fun getDefaultWritableAccount(context: Context, resolver: ContentResolver): Pair<String?, String?> {
-            // Use DefaultAccount API if available (Android 8.0+ / API 26+)
+        private fun getDefaultWritableAccount(
+            context: Context,
+            resolver: ContentResolver
+        ): Pair<String, String>? {
+            // 1. Try DefaultAccount API (Android 8.0+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 runCatching {
-                    val defaultAccountAndState = ContactsContract.RawContacts.DefaultAccount
-                        .getDefaultAccountForNewContacts(resolver)
-                    
-                     // Only use cloud accounts to avoid the error
-                     if (defaultAccountAndState.state == ContactsContract.RawContacts.DefaultAccount.DefaultAccountAndState.DEFAULT_ACCOUNT_STATE_CLOUD) {
-                         defaultAccountAndState.account?.let { account ->
-                             Log.d("FlutterContacts", "Using system default cloud account: ${account.name} (${account.type})")
-                             return Pair(account.type, account.name)
-                         }
-                     }
+                    val defaultAccountAndState =
+                        ContactsContract.RawContacts.DefaultAccount.getDefaultAccountForNewContacts(resolver)
+
+                    if (defaultAccountAndState.state ==
+                        ContactsContract.RawContacts.DefaultAccount.DefaultAccountAndState.DEFAULT_ACCOUNT_STATE_CLOUD
+                    ) {
+                        defaultAccountAndState.account?.let { account ->
+                            Log.d(
+                                "FlutterContacts",
+                                "Using system default cloud account: ${account.name} (${account.type})"
+                            )
+                            return Pair(account.type, account.name)
+                        }
+                    }
                 }.onFailure { e ->
                     Log.w("FlutterContacts", "Failed to get system default account: ${e.message}")
                 }
             }
-            
-            // Final fallback: Use null account (local storage)
-            Log.d("FlutterContacts", "No cloud account available, using local storage")
-            return Pair(null, null)
+
+            // 2. Fallback – try to find a Google account
+            runCatching {
+                val accountManager = AccountManager.get(context)
+                val googleAccounts = accountManager.getAccountsByType("com.google")
+                if (googleAccounts.isNotEmpty()) {
+                    val account = googleAccounts[0]
+                    Log.d(
+                        "FlutterContacts",
+                        "Falling back to first Google account: ${account.name} (${account.type})"
+                    )
+                    return Pair(account.type, account.name)
+                }
+            }.onFailure { e ->
+                Log.w("FlutterContacts", "Failed to query Google accounts: ${e.message}")
+            }
+
+            // 3. No acceptable cloud account found
+            Log.e(
+                "FlutterContacts",
+                "No writable cloud account found. Cannot insert contact when default account is cloud."
+            )
+            return null
         }
     }
 }
