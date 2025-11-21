@@ -232,11 +232,7 @@ class FlutterContacts {
                 val columnIndex = cursor.getColumnIndex(col)
                 if (columnIndex == -1) return ""
                 return try {
-                    if (cursor.getType(columnIndex) == Cursor.FIELD_TYPE_STRING) {
-                        cursor.getString(columnIndex) ?: ""
-                    } else {
-                        ""
-                    }
+                    cursor.getString(columnIndex) ?: ""
                 } catch (e: Exception) {
                     ""
                 }
@@ -245,11 +241,7 @@ class FlutterContacts {
                 val columnIndex = cursor.getColumnIndex(col)
                 if (columnIndex == -1) return 0
                 return try {
-                    if (cursor.getType(columnIndex) == Cursor.FIELD_TYPE_INTEGER) {
-                        cursor.getInt(columnIndex) ?: 0
-                    } else {
-                        0
-                    }
+                    cursor.getInt(columnIndex)
                 } catch (e: Exception) {
                     0
                 }
@@ -923,19 +915,19 @@ class FlutterContacts {
                 val idIndex = cursor.getColumnIndex(Contacts._ID)
                 val displayNameIndex = cursor.getColumnIndex(Contacts.DISPLAY_NAME_PRIMARY)
                 val starredIndex = cursor.getColumnIndex(Contacts.STARRED)
-                
-                val id = if (idIndex != -1 && cursor.getType(idIndex) == Cursor.FIELD_TYPE_STRING) {
-                    cursor.getString(idIndex) ?: ""
+
+                val id = if (idIndex != -1) {
+                    try { cursor.getString(idIndex) ?: "" } catch (e: Exception) { "" }
                 } else { "" }
-                
-                val displayName = if (displayNameIndex != -1 && cursor.getType(displayNameIndex) == Cursor.FIELD_TYPE_STRING) {
-                    cursor.getString(displayNameIndex) ?: ""
+
+                val displayName = if (displayNameIndex != -1) {
+                    try { cursor.getString(displayNameIndex) ?: "" } catch (e: Exception) { "" }
                 } else { "" }
-                
-                val isStarred = if (starredIndex != -1 && cursor.getType(starredIndex) == Cursor.FIELD_TYPE_INTEGER) {
-                    cursor.getInt(starredIndex) == 1
+
+                val isStarred = if (starredIndex != -1) {
+                    try { cursor.getInt(starredIndex) == 1 } catch (e: Exception) { false }
                 } else { false }
-                
+
                 contacts.add(
                     Contact(
                         /*id=*/id,
@@ -996,15 +988,15 @@ class FlutterContacts {
             while (cursor.moveToNext()) {
                 val idIndex = cursor.getColumnIndex(Groups._ID)
                 val titleIndex = cursor.getColumnIndex(Groups.TITLE)
-                
-                val groupId = if (idIndex != -1 && cursor.getType(idIndex) == Cursor.FIELD_TYPE_STRING) {
-                    cursor.getString(idIndex) ?: ""
+
+                val groupId = if (idIndex != -1) {
+                    try { cursor.getString(idIndex) ?: "" } catch (e: Exception) { "" }
                 } else { "" }
-                
-                val groupName = if (titleIndex != -1 && cursor.getType(titleIndex) == Cursor.FIELD_TYPE_STRING) {
-                    cursor.getString(titleIndex) ?: ""
+
+                val groupName = if (titleIndex != -1) {
+                    try { cursor.getString(titleIndex) ?: "" } catch (e: Exception) { "" }
                 } else { "" }
-                
+
                 groups[groupId] = PGroup(id = groupId, name = groupName)
             }
             return groups
